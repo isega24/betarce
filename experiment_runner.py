@@ -1,5 +1,11 @@
 import traceback
 import sys
+import os
+
+# Silence TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 import hydra
 from omegaconf import DictConfig, OmegaConf
 

@@ -219,7 +219,10 @@ class Experiment:
                                 base_record,
                             )
 
+            # Save results after each combination (dataset/fold/classifier/exp_type/explainer)
             self.save_results()
+            logging.info(f"Saved results for combination: {combination}")
+            
         self.pbar.close()
 
     def robust_part(
@@ -328,28 +331,36 @@ class Experiment:
     def add_to_results(self, record: dict) -> None:
         self.results_list.append(record)
 
+        # Optional: also save periodically based on save_every (as backup)
         if len(self.results_list) % self.cfg_exp["save_every"] == 0:
             self.save_results()
 
-    def save_results(self) -> None:
+    def save_results(self, combination_info: str = None) -> None:
         if len(self.results_list) == 0:
             return
 
         df = pd.DataFrame(self.results_list)
         format = self.cfg_gen["save_format"]
+        
+        # Create results directory if it doesn't exist
+        results_dir = os.path.join(self.cfg_gen["result_path"], "results")
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Use timestamp to avoid overwriting
+        timestamp = int(time.time() * 1000)
         path = os.path.join(
-            self.cfg_gen["result_path"],
-            "results",
-            f"results_{self.global_iter}.{format}",
+            results_dir,
+            f"results_{self.global_iter}_{timestamp}.{format}",
         )
 
         if format == "csv":
-            df.to_csv(path)
+            df.to_csv(path, index=False)
         elif format == "feather":
             df.to_feather(path)
         else:
             raise ValueError(f"Unknown save format: {format}")
 
+        logging.debug(f"Saved {len(self.results_list)} records to {path}")
         self.results_list = []
 
     def get_base_record(self, combination: tuple) -> dict:

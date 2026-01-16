@@ -10,6 +10,12 @@ from .classifiers.mlpclassifier import (
     train_neural_network,
     train_K_mlps_in_parallel,
 )
+from .classifiers.mlpclassifier_custom_loss import (
+    MLPClassifierContrastive,
+    train_neural_network_contrastive,
+    train_K_mlps_contrastive,
+    train_K_mlps_contrastive_in_parallel,
+)
 from .classifiers.rfclassifier import (
     RFClassifier,
     train_random_forest,
@@ -51,6 +57,19 @@ def get_config(path: str = "./config.yml") -> dict:
 def train_model(X_train, y_train, model_type: str, seed: int, hparams: dict) -> tuple:
     if model_type == "neural_network":
         m, pp, pc = train_neural_network(X_train, y_train, seed, hparams)
+    elif model_type == "neural_network_contrastive":
+        # Extract contrastive-specific hyperparameters
+        lambda_contrastive = hparams.get("lambda_contrastive", 0.1)
+        contrastive_loss_type = hparams.get("contrastive_loss_type", "supervised")
+        contrastive_margin = hparams.get("contrastive_margin", 1.0)
+        contrastive_temperature = hparams.get("contrastive_temperature", 0.5)
+        m, pp, pc = train_neural_network_contrastive(
+            X_train, y_train, seed, hparams,
+            lambda_contrastive=lambda_contrastive,
+            contrastive_loss_type=contrastive_loss_type,
+            contrastive_margin=contrastive_margin,
+            contrastive_temperature=contrastive_temperature,
+        )
     elif model_type == "random_forest":
         m, pp, pc = train_random_forest(X_train, y_train, seed, hparams)
     elif model_type == "decision_tree":
@@ -96,6 +115,15 @@ def train_B(
     match model_type_to_use:
         case "neural_network":
             results = train_K_mlps_in_parallel(**kwargs)
+        case "neural_network_contrastive":
+            # Add contrastive-specific parameters
+            lambda_contrastive = model_base_hyperparameters.get("lambda_contrastive", 0.1)
+            contrastive_loss_type = model_base_hyperparameters.get("contrastive_loss_type", "supervised")
+            results = train_K_mlps_contrastive_in_parallel(
+                **kwargs,
+                lambda_contrastive=lambda_contrastive,
+                contrastive_loss_type=contrastive_loss_type,
+            )
         case "decision_tree":
             results = train_K_dts_in_parallel(**kwargs)
         case "lightgbm":

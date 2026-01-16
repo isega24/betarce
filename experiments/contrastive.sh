@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# ==============================================================================
+# Experiment Script for Contrastive Learning Neural Network
+# ==============================================================================
+# This script runs experiments using the MLPClassifierContrastive model
+# which includes contrastive learning regularization in the loss function.
+# ==============================================================================
+
 # SLURM Configuration
 # Adjust SLURM_PARTITION to one of: dgx, dios, default
 SLURM_PARTITION=${SLURM_PARTITION:-dgx}
@@ -8,21 +15,20 @@ SLURM_PARTITION=${SLURM_PARTITION:-dgx}
 # Use joblib for local execution, submitit_slurm for SLURM cluster
 HYDRA_LAUNCHER=${HYDRA_LAUNCHER:-joblib}
 
-#SBATCH --job-name=betarce_just_base
+#SBATCH --job-name=betarce_contrastive
 #SBATCH --partition=$SLURM_PARTITION
 #SBATCH --gres=gpu:1
-#SBATCH --output=just_base.log
-#SBATCH --error=just_base.log
+#SBATCH --output=contrastive.log
+#SBATCH --error=contrastive.log
 #SBATCH --mem=16G
-
 
 
 # Get the parent directory (root of the repo)
 REPO_ROOT="./"
 echo "Repo root: $REPO_ROOT"
 
-EXPERIMENT_NAME="just_base"
-CONFIG_FILENAME="config_exp"
+EXPERIMENT_NAME="contrastive"
+CONFIG_FILENAME="config_exp_contrastive"
 
 # PATHS - relative to repo root
 BASE_PATH="results/$EXPERIMENT_NAME/"
@@ -33,21 +39,24 @@ RESULT_PATH="results/$EXPERIMENT_NAME/results/"
 # Create directories if they don't exist
 mkdir -p "$REPO_ROOT/$MODEL_PATH" "$REPO_ROOT/$LOG_PATH" "$REPO_ROOT/$RESULT_PATH"
 
-# SWEEP
-robust_method=[]
-base_cf=[]
-e2e_explainers=[roar],[rbr]
+# ==============================================================================
+# SWEEP CONFIGURATION
+# ==============================================================================
+# Only use neural_network_contrastive classifier
+robust_method=[robx],[betarob]
+base_cf=[gs],[dice],[face]
+e2e_explainers=[]
 datasets=[car_eval],[rice],[wine_quality],[fico],[diabetes],[breast_cancer]
 ex_type=[Architecture],[Bootstrap],[Seed]
-model_type_to_use=[neural_network],[logistic_regression],[lightgbm]
+model_type_to_use=[neural_network_contrastive]
 
 echo "Running experiment: $EXPERIMENT_NAME"
+echo "Using classifier: neural_network_contrastive (with contrastive learning regularization)"
 
 # Setup conda environment
 export PATH="/opt/anaconda/anaconda3/bin:$PATH"
 export PATH="/opt/anaconda/bin:$PATH"
 eval "$(conda shell.bash hook)"
-
 
 conda activate "$REPO_ROOT/.conda/"
 

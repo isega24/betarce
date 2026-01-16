@@ -1,17 +1,17 @@
 defaults:
-  # - override hydra/launcher: joblib
-  - override hydra/launcher: submitit_slurm
+  - override hydra/launcher: joblib
+  # - override hydra/launcher: submitit_slurm
 
 hydra:
   launcher:
     # JOBLIB max jobs
-    # n_jobs: 10
+    n_jobs: 10
 
-    # SLURM
-    cpus_per_task: 1
-    mem_per_cpu: 6G
-    timeout_min: 10080
-    partition: obl
+    # SLURM (only used when launcher is submitit_slurm)
+    # cpus_per_task: 1
+    # mem_per_cpu: 6G
+    # timeout_min: 10080
+    # partition: obl
 
 
 general:
