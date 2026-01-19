@@ -1,0 +1,248 @@
+# ==============================================================================
+# TRIAL CONFIG - Fast testing for Contrastive Learning
+# ==============================================================================
+# Reduced parameters for quick testing:
+# - 1 dataset (fico)
+# - 1 fold
+# - 5 test samples
+# - 5 m2 models
+# - 1 ex_type (Seed)
+# - 1 posthoc explainer (robx - faster)
+# - 1 base explainer (gs - faster)
+# - Only neural_network_contrastive classifier
+# 
+# Estimated time: ~5-10 minutes
+# ==============================================================================
+
+defaults:
+  - override hydra/launcher: joblib
+
+hydra:
+  launcher:
+    n_jobs: 5
+
+general:
+  data_path: data/
+  model_path: trial_contrastive/models/
+  result_path: trial_contrastive/results/
+  log_path: trial_contrastive/logs/
+  save_format: csv  # CSV is more reliable than feather
+  random_state: 345
+  random_seed: 345
+  logging_level: INFO
+  n_jobs: 1
+
+experiments_setup:
+  pretrain: True
+  n_pretrain: 10  # Reduced from 50
+  base_explainers:
+    - "gs"  # Only GrowingSpheres (fastest)
+  e2e_explainers: null  # No e2e explainers for speed
+  posthoc_explainers:
+    - "robx"  # Only RobX (faster than betarob)
+  ex_types:
+    - "Seed"  # Only one type
+  perform_generalizations: False
+  datasets:
+    - "fico"  # Only one dataset
+  x_test_size: 5  # Reduced from 30
+  m2_count: 5  # Reduced from 30
+  cross_validation_folds: 2  # Reduced from 3
+  metrics_to_calculate:
+    - "validity"
+    - "proximityL1"
+    - "proximityL2"
+    - "plausibility"
+    - "dpow"
+  classifiers:
+    - "neural_network_contrastive"
+  pretrain_N: 10  # Reduced
+  save_every: 100
+  
+model_hyperparameters:
+  # ==============================================================================
+  # Neural Network with Contrastive Learning Regularization (TRIAL)
+  # ==============================================================================
+  neural_network_contrastive:
+    model_hyperparameters_pool:
+      hidden_layers:
+        lower: 3
+        upper: 4
+      neurons_per_layer:
+        lower: 32
+        upper: 128
+      activation:
+        - "relu"
+      optimizer:
+        - "adam"
+      lambda_contrastive:
+        lower: 0.05
+        upper: 0.2
+        resolution: 3
+      contrastive_loss_type:
+        - "supervised"
+    model_fixed_hyperparameters:
+      hidden_layers: 3
+      neurons_per_layer: 64
+      activation: "relu"
+      optimizer: "adam"
+      lambda_contrastive: 0.1
+      contrastive_loss_type: "supervised"
+      contrastive_margin: 1.0
+      contrastive_temperature: 0.5
+    model_fixed_seed: 42
+    model_base_hyperparameters:
+      loss: "BCELoss+Contrastive"
+      early_stopping: True
+      lr: 0.001
+      epochs: 50  # Reduced from 100
+      batch_size: 128
+      verbose: False  # Less output
+      dropout: 0.4
+      classification_threshold: 0.5
+      lambda_contrastive: 0.1
+      contrastive_loss_type: "supervised"
+      contrastive_margin: 1.0
+      contrastive_temperature: 0.5
+
+  # Standard neural network (for comparison if needed)
+  neural_network:
+    model_hyperparameters_pool:
+      hidden_layers:
+        lower: 3
+        upper: 4
+      neurons_per_layer:
+        lower: 32
+        upper: 128
+      activation:
+        - "relu"
+      optimizer:
+        - "adam"
+    model_fixed_hyperparameters:
+      hidden_layers: 3
+      neurons_per_layer: 64
+      activation: "relu"
+      optimizer: "adam"
+    model_fixed_seed: 42
+    model_base_hyperparameters:
+      loss: "BCELoss"
+      early_stopping: True
+      lr: 0.001
+      epochs: 50
+      batch_size: 128
+      verbose: False
+      dropout: 0.4
+      classification_threshold: 0.5  
+
+  lightgbm:
+    model_hyperparameters_pool:
+      num_leaves:
+        lower: 10
+        upper: 15
+      n_estimators:
+        lower: 15
+        upper: 25
+      min_child_samples:
+        lower: 10
+        upper: 15
+      subsample:
+        lower: 0.7
+        upper: 1
+        resolution: 5
+    model_base_hyperparameters:
+      objective: "binary"
+      verbose: -1
+      seed: 42
+      classification_threshold: 0.5
+      n_jobs: 4
+    model_fixed_hyperparameters:
+      num_leaves: 15
+      n_estimators: 20
+      min_child_samples: 15
+      subsample: 0.8
+    model_fixed_seed: 42
+
+  logistic_regression:
+    model_hyperparameters_pool:
+      C:
+        lower: 0.5
+        upper: 1.0
+        resolution: 5
+      penalty:
+        - "l2"
+      max_iter:
+        lower: 50
+        upper: 100
+        resolution: 5
+      solver:
+        - "lbfgs"
+    model_base_hyperparameters:
+      verbose: 0
+      n_jobs: 1
+      classification_threshold: 0.5
+      seed: 42
+    model_fixed_hyperparameters:
+      C: 1
+      penalty: "l2"
+      max_iter: 100
+      solver: "lbfgs"
+    model_fixed_seed: 42
+      
+betarob:
+  pool_hps:
+    k: 
+      - 8
+    beta:
+      - 0.9
+    delta:
+      - 0.9
+  fixed_hps:
+    gs:
+      max_iter: 50
+      n_search_samples: 50
+      p_norm: 2
+      step: 0.1
+      target_proba: 0.5
+
+gs:
+  max_iter: 50
+  n_search_samples: 50
+  p_norm: 2
+  step: 0.1
+  target_proba: 0.5
+
+robx:
+  pool_hps:
+    tau: 
+      - 0.5
+    variance: 
+      - 0.1
+  fixed_hps:
+    N: 500
+
+roar:
+  delta_max: [0.05]
+  lr: [0.05]
+  norm: [2]
+
+rbr: 
+  ec:
+    num_samples: 50
+    max_distance: 1.0
+    rbr_params: 
+        delta_plus: [0.1]
+        sigma: [1.0]
+        epsilon_op: 0.0
+        epsilon_pe: 0.0
+  perturb_radius:
+      synthesis: [0.2]
+  device: "cpu"
+
+face:
+  mode: ['knn']
+  fraction: [0.3]
+
+dice: 
+  proximity_weight: [0.1]
+  diversity_weight: [0.1]
+  sparsity_weight: [0.1]

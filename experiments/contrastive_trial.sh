@@ -1,11 +1,18 @@
 #!/bin/bash
+#SBATCH --job-name=betarce_contrastive_trial
+#SBATCH --partition=dgx
+#SBATCH --gres=gpu:1
+#SBATCH --output=contrastive_trial.log
+#SBATCH --error=contrastive_trial.log
+#SBATCH --mem=8G
+#SBATCH --time=01:00:00
 
 # ==============================================================================
 # TRIAL SCRIPT - Fast testing for Contrastive Learning Neural Network
 # ==============================================================================
 # Reduced configuration for quick testing:
 # - 1 dataset (fico)
-# - 1 fold
+# - 2 folds
 # - 5 test samples
 # - 5 m2 models
 # - 1 ex_type (Seed)
@@ -13,21 +20,12 @@
 # - 1 base explainer (gs)
 # - Only neural_network_contrastive classifier
 #
-# Expected iterations: 1 * 1 * 1 * 1 * 1 * 5 * 5 * 1 = 25 iterations
+# Expected iterations: ~50 iterations
 # Estimated time: ~5-10 minutes
 # ==============================================================================
 
-# SLURM Configuration
-SLURM_PARTITION=${SLURM_PARTITION:-dgx}
+# Hydra launcher: joblib (local) or submitit_slurm (cluster)
 HYDRA_LAUNCHER=${HYDRA_LAUNCHER:-joblib}
-
-#SBATCH --job-name=betarce_contrastive_trial
-#SBATCH --partition=$SLURM_PARTITION
-#SBATCH --gres=gpu:1
-#SBATCH --output=contrastive_trial.log
-#SBATCH --error=contrastive_trial.log
-#SBATCH --mem=8G
-#SBATCH --time=01:00:00
 
 # Get the parent directory (root of the repo)
 REPO_ROOT="./"

@@ -16,9 +16,9 @@ hydra:
 
 general:
   data_path: data/
-  model_path: kdd/models/
-  result_path: kdd/results/
-  log_path: kdd/logs/
+  model_path: contrastive/models/
+  result_path: contrastive/results/
+  log_path: contrastive/logs/
   save_format: csv
   random_state: 345
   random_seed: 345
@@ -60,13 +60,69 @@ experiments_setup:
     - "plausibility"
     - "dpow"
   classifiers:
-    - "neural_network"
-    - "lightgbm"
-    - "logistic_regression"
+    - "neural_network_contrastive"
   pretrain_N: 100
   save_every: 1000
   
 model_hyperparameters:
+  # ==============================================================================
+  # Neural Network with Contrastive Learning Regularization
+  # ==============================================================================
+  # This classifier uses BCE + Contrastive Loss
+  # Loss = BCE_loss + lambda_contrastive * contrastive_loss
+  # 
+  # Contrastive learning ensures that:
+  # - Samples with same prediction are close in embedding space
+  # - Samples with different predictions are far apart
+  # ==============================================================================
+  neural_network_contrastive:
+    model_hyperparameters_pool:
+      hidden_layers:
+        lower: 3
+        upper: 5
+      neurons_per_layer:
+        lower: 32
+        upper: 256
+      activation:
+        - "relu"
+      optimizer:
+        - "adam"
+      # Contrastive learning hyperparameters
+      lambda_contrastive:
+        lower: 0.01
+        upper: 0.5
+        resolution: 10
+      contrastive_loss_type:
+        - "supervised"
+        - "simple"
+        - "triplet"
+    model_fixed_hyperparameters:
+      hidden_layers: 3
+      neurons_per_layer: 128
+      activation: "relu"
+      optimizer: "adam"
+      # Fixed contrastive hyperparameters
+      lambda_contrastive: 0.1
+      contrastive_loss_type: "supervised"
+      contrastive_margin: 1.0
+      contrastive_temperature: 0.5
+    model_fixed_seed: 42
+    model_base_hyperparameters:
+      loss: "BCELoss+Contrastive"
+      early_stopping: True
+      lr: 0.001
+      epochs: 100
+      batch_size: 128
+      verbose: True
+      dropout: 0.4
+      classification_threshold: 0.5
+      # Default contrastive parameters (can be overridden)
+      lambda_contrastive: 0.1
+      contrastive_loss_type: "supervised"
+      contrastive_margin: 1.0
+      contrastive_temperature: 0.5
+
+  # Standard neural network (for comparison)
   neural_network:
     model_hyperparameters_pool:
       hidden_layers:

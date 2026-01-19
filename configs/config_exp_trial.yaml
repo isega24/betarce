@@ -1,25 +1,31 @@
+# ==============================================================================
+# TRIAL CONFIG - Fast testing configuration
+# ==============================================================================
+# Reduced parameters for quick testing:
+# - 1 dataset (fico)
+# - 1 fold
+# - 5 test samples
+# - 5 m2 models
+# - 1 ex_type (Seed)
+# - 1 posthoc explainer (robx - faster)
+# - 1 base explainer (gs - faster)
+# 
+# Estimated time: ~5-15 minutes
+# ==============================================================================
+
 defaults:
   - override hydra/launcher: joblib
-  # - override hydra/launcher: submitit_slurm
 
 hydra:
   launcher:
-    # JOBLIB max jobs
-    n_jobs: 10
-
-    # SLURM (only used when launcher is submitit_slurm)
-    # cpus_per_task: 1
-    # mem_per_cpu: 6G
-    # timeout_min: 10080
-    # partition: obl
-
+    n_jobs: 5
 
 general:
   data_path: data/
-  model_path: kdd/models/
-  result_path: kdd/results/
-  log_path: kdd/logs/
-  save_format: csv
+  model_path: trial/models/
+  result_path: trial/results/
+  log_path: trial/logs/
+  save_format: csv  # CSV is more reliable than feather
   random_state: 345
   random_seed: 345
   logging_level: INFO
@@ -27,32 +33,20 @@ general:
 
 experiments_setup:
   pretrain: True
-  n_pretrain: 50
+  n_pretrain: 10  # Reduced from 50
   base_explainers:
-    - "gs"
-    - "dice"
-    - "face"
-  e2e_explainers:
-    - "roar"
-    - "rbr"
+    - "gs"  # Only GrowingSpheres (fastest)
+  e2e_explainers: null  # No e2e explainers for speed
   posthoc_explainers:
-    - "betarob"
-    - "robx"
+    - "robx"  # Only RobX (faster than betarob)
   ex_types:
-    - "Architecture"
-    - "Seed"
-    - "Bootstrap"
+    - "Seed"  # Only one type
   perform_generalizations: False
   datasets:
-    - "fico"
-    - "wine_quality"
-    - "breast_cancer"
-    - "car_eval"
-    - "rice"
-    - "diabetes"
-  x_test_size: 30
-  m2_count: 30
-  cross_validation_folds: 3
+    - "fico"  # Only one dataset
+  x_test_size: 5  # Reduced from 30
+  m2_count: 5  # Reduced from 30
+  cross_validation_folds: 2  # Reduced from 3
   metrics_to_calculate:
     - "validity"
     - "proximityL1"
@@ -63,25 +57,25 @@ experiments_setup:
     - "neural_network"
     - "lightgbm"
     - "logistic_regression"
-  pretrain_N: 100
-  save_every: 1000
+  pretrain_N: 10  # Reduced
+  save_every: 100
   
 model_hyperparameters:
   neural_network:
     model_hyperparameters_pool:
       hidden_layers:
         lower: 3
-        upper: 5
+        upper: 4
       neurons_per_layer:
         lower: 32
-        upper: 256
+        upper: 128
       activation:
         - "relu"
       optimizer:
         - "adam"
     model_fixed_hyperparameters:
       hidden_layers: 3
-      neurons_per_layer: 128
+      neurons_per_layer: 64
       activation: "relu"
       optimizer: "adam"
     model_fixed_seed: 42
@@ -89,59 +83,27 @@ model_hyperparameters:
       loss: "BCELoss"
       early_stopping: True
       lr: 0.001
-      epochs: 100
+      epochs: 50  # Reduced from 100
       batch_size: 128
-      verbose: True
+      verbose: False  # Less output
       dropout: 0.4
       classification_threshold: 0.5  
-
-  decision_tree:
-    model_hyperparameters_pool:
-      max_depth:
-        lower: 5
-        upper: 10
-      min_samples_split:
-        lower: 2
-        upper: 5
-      min_samples_leaf:
-        lower: 1
-        upper: 4
-      criterion:
-        - "gini"
-        - "entropy"
-        - "log_loss"
-      max_features:
-        - "sqrt"
-        - "log2"
-    model_fixed_hyperparameters:
-      max_depth: 8
-      min_samples_split: 2
-      min_samples_leaf: 1
-      criterion: "gini"
-      max_features: "sqrt"
-    model_fixed_seed: 42
-    model_base_hyperparameters:
-      criterion: "gini"
-      verbose: 0
-      n_jobs: 1
-      seed: 42
-      classification_threshold: 0.5
 
   lightgbm:
     model_hyperparameters_pool:
       num_leaves:
         lower: 10
-        upper: 20
+        upper: 15
       n_estimators:
         lower: 15
-        upper: 40
+        upper: 25
       min_child_samples:
         lower: 10
-        upper: 20
+        upper: 15
       subsample:
-        lower: 0.5
+        lower: 0.7
         upper: 1
-        resolution: 10
+        resolution: 5
     model_base_hyperparameters:
       objective: "binary"
       verbose: -1
@@ -150,29 +112,25 @@ model_hyperparameters:
       n_jobs: 4
     model_fixed_hyperparameters:
       num_leaves: 15
-      n_estimators: 30
-      min_child_samples: 20
+      n_estimators: 20
+      min_child_samples: 15
       subsample: 0.8
     model_fixed_seed: 42
-
 
   logistic_regression:
     model_hyperparameters_pool:
       C:
-        lower: 0.1
+        lower: 0.5
         upper: 1.0
-        resolution: 10
+        resolution: 5
       penalty:
         - "l2"
-        - null
       max_iter:
         lower: 50
-        upper: 200
-        resolution: 10
+        upper: 100
+        resolution: 5
       solver:
         - "lbfgs"
-        - "newton-cg"
-        - "sag"
     model_base_hyperparameters:
       verbose: 0
       n_jobs: 1
@@ -188,23 +146,22 @@ model_hyperparameters:
 betarob:
   pool_hps:
     k: 
-      - 32
+      - 16
     beta:
       - 0.9
     delta:
-      - 0.8
       - 0.9
   fixed_hps:
     gs:
-      max_iter: 100
-      n_search_samples: 100
+      max_iter: 50
+      n_search_samples: 50
       p_norm: 2
       step: 0.1
       target_proba: 0.5
 
 gs:
-  max_iter: 100
-  n_search_samples: 100
+  max_iter: 50
+  n_search_samples: 50
   p_norm: 2
   step: 0.1
   target_proba: 0.5
@@ -215,33 +172,32 @@ robx:
       - 0.5
     variance: 
       - 0.1
-      - 0.01
   fixed_hps:
-    N: 1000
+    N: 500
 
 roar:
-  delta_max: [0.01, 0.05, 0.1]
-  lr: [0.01, 0.05, 0.1]
-  norm: [1, 2]
+  delta_max: [0.05]
+  lr: [0.05]
+  norm: [2]
 
 rbr: 
   ec:
-    num_samples: 100
+    num_samples: 50
     max_distance: 1.0
     rbr_params: 
-        delta_plus: [0.0, 0.1, 0.2]
-        sigma: [0.5, 1.0, 1.5]
+        delta_plus: [0.1]
+        sigma: [1.0]
         epsilon_op: 0.0
         epsilon_pe: 0.0
   perturb_radius:
-      synthesis: [0.1, 0.2, 0.3]
+      synthesis: [0.2]
   device: "cpu"
 
 face:
-  mode: ['knn', 'epsilon']
-  fraction: [0.1, 0.3, 0.5]
+  mode: ['knn']
+  fraction: [0.3]
 
 dice: 
-  proximity_weight: [0.05, 0.1, 0.2]
-  diversity_weight: [0.05, 0.1, 0.2]
-  sparsity_weight: [0.05, 0.1, 0.2]
+  proximity_weight: [0.1]
+  diversity_weight: [0.1]
+  sparsity_weight: [0.1]

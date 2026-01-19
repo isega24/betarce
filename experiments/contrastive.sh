@@ -1,4 +1,10 @@
 #!/bin/bash
+#SBATCH --job-name=betarce_contrastive
+#SBATCH --partition=dgx
+#SBATCH --gres=gpu:1
+#SBATCH --output=contrastive.log
+#SBATCH --error=contrastive.log
+#SBATCH --mem=16G
 
 # ==============================================================================
 # Experiment Script for Contrastive Learning Neural Network
@@ -7,21 +13,8 @@
 # which includes contrastive learning regularization in the loss function.
 # ==============================================================================
 
-# SLURM Configuration
-# Adjust SLURM_PARTITION to one of: dgx, dios, default
-SLURM_PARTITION=${SLURM_PARTITION:-dgx}
-
 # Hydra launcher: joblib (local) or submitit_slurm (cluster)
-# Use joblib for local execution, submitit_slurm for SLURM cluster
 HYDRA_LAUNCHER=${HYDRA_LAUNCHER:-joblib}
-
-#SBATCH --job-name=betarce_contrastive
-#SBATCH --partition=$SLURM_PARTITION
-#SBATCH --gres=gpu:1
-#SBATCH --output=contrastive.log
-#SBATCH --error=contrastive.log
-#SBATCH --mem=16G
-
 
 # Get the parent directory (root of the repo)
 REPO_ROOT="./"

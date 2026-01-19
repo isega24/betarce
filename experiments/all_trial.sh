@@ -1,11 +1,18 @@
 #!/bin/bash
+#SBATCH --job-name=betarce_trial
+#SBATCH --partition=dgx
+#SBATCH --gres=gpu:1
+#SBATCH --output=trial.log
+#SBATCH --error=trial.log
+#SBATCH --mem=8G
+#SBATCH --time=01:00:00
 
 # ==============================================================================
 # TRIAL SCRIPT - Fast testing for all classifiers
 # ==============================================================================
 # Reduced configuration for quick testing:
 # - 1 dataset (fico)
-# - 1 fold
+# - 2 folds
 # - 5 test samples
 # - 5 m2 models
 # - 1 ex_type (Seed)
@@ -13,21 +20,12 @@
 # - 1 base explainer (gs)
 # - 3 classifiers (neural_network, lightgbm, logistic_regression)
 #
-# Expected iterations: 1 * 1 * 3 * 1 * 1 * 5 * 5 * 1 = 75 iterations
-# Estimated time: ~5-15 minutes
+# Expected iterations: ~150 iterations
+# Estimated time: ~10-20 minutes
 # ==============================================================================
 
-# SLURM Configuration
-SLURM_PARTITION=${SLURM_PARTITION:-dgx}
+# Hydra launcher: joblib (local) or submitit_slurm (cluster)
 HYDRA_LAUNCHER=${HYDRA_LAUNCHER:-joblib}
-
-#SBATCH --job-name=betarce_trial
-#SBATCH --partition=$SLURM_PARTITION
-#SBATCH --gres=gpu:1
-#SBATCH --output=trial.log
-#SBATCH --error=trial.log
-#SBATCH --mem=8G
-#SBATCH --time=01:00:00
 
 # Get the parent directory (root of the repo)
 REPO_ROOT="./"
