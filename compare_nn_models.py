@@ -74,6 +74,32 @@ class Config:
         "accuracy": "accuracy"
     }
     
+    # Dirección de las métricas: True = mayor es mejor (↑), False = menor es mejor (↓)
+    METRIC_DIRECTION = {
+        "base_counterfactual_validity": True,           # Mayor es mejor
+        "base_counterfactual_proximityL1": False,       # Menor es mejor
+        "base_counterfactual_proximityL2": False,       # Menor es mejor
+        "base_counterfactual_plausibility": False,      # Menor es mejor (distancia a vecinos)
+        "base_counterfactual_discriminative_power": True,  # Mayor es mejor
+        "robust_counterfactual_validity": True,
+        "robust_counterfactual_proximityL1": False,
+        "robust_counterfactual_proximityL2": False,
+        "robust_counterfactual_plausibility": False,
+        "robust_counterfactual_discriminative_power": True,
+        "accuracy": True,                               # Mayor es mejor
+        # Nombres cortos también
+        "validity": True,
+        "proximityL1": False,
+        "proximityL2": False,
+        "plausibility": False,
+        "dpow": True,
+        "validity (robust)": True,
+        "proximityL1 (robust)": False,
+        "proximityL2 (robust)": False,
+        "plausibility (robust)": False,
+        "dpow (robust)": True,
+    }
+    
     # Etiquetas para experimentos
     EXPERIMENT_LABELS = {
         "nn_standard": "Neural Network (standard)",
@@ -92,6 +118,36 @@ class Config:
     # Figsize para gráficos
     FIGSIZE_SINGLE = (12, 6)
     FIGSIZE_MULTI = (16, 10)
+
+
+def get_metric_name_with_arrow(metric: str, config: Config) -> str:
+    """
+    Obtiene el nombre legible de una métrica con flecha indicando dirección.
+    
+    ↑ = Mayor es mejor
+    ↓ = Menor es mejor
+    
+    Args:
+        metric: Nombre de la métrica (puede ser nombre completo o corto)
+        config: Objeto de configuración
+        
+    Returns:
+        Nombre de la métrica con flecha de dirección
+    """
+    # Obtener nombre legible
+    metric_name = config.METRIC_NAMES.get(metric, metric.replace('base_counterfactual_', '').replace('robust_counterfactual_', ''))
+    
+    # Determinar dirección (buscar tanto en nombre completo como en nombre corto)
+    is_higher_better = config.METRIC_DIRECTION.get(metric, config.METRIC_DIRECTION.get(metric_name, None))
+    
+    if is_higher_better is True:
+        arrow = "↑"
+    elif is_higher_better is False:
+        arrow = "↓"
+    else:
+        arrow = ""
+    
+    return f"{metric_name} {arrow}".strip()
 
 
 # ============================================================================
@@ -166,6 +222,80 @@ def prepare_metrics_for_analysis(df: pd.DataFrame, config: Config) -> pd.DataFra
     return df_copy
 
 
+def remove_outliers_iqr(df: pd.DataFrame, column: str, k: float = 3.0) -> pd.DataFrame:
+    """
+    Elimina outliers de un DataFrame basándose en el rango intercuartílico (IQR).
+    
+    Outliers se definen como valores fuera del rango [Q1 - k*IQR, Q3 + k*IQR].
+    
+    Args:
+        df: DataFrame de entrada
+        column: Nombre de la columna a filtrar
+        k: Factor multiplicador del IQR (por defecto 3.0 para outliers extremos)
+        
+    Returns:
+        DataFrame filtrado sin outliers
+    """
+    if column not in df.columns:
+        return df
+    
+    data = df[column].dropna()
+    if len(data) == 0:
+        return df
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - k * IQR
+    upper_bound = Q3 + k * IQR
+    
+    # Filtrar manteniendo NaN (no son outliers, simplemente no tienen dato)
+    mask = (df[column].isna()) | ((df[column] >= lower_bound) & (df[column] <= upper_bound))
+    
+    n_removed = len(df) - mask.sum()
+    if n_removed > 0:
+        print(f"  [IQR Filter] {column}: eliminados {n_removed} outliers (bounds: [{lower_bound:.4f}, {upper_bound:.4f}])")
+    
+    return df[mask].copy()
+
+
+def remove_outliers_from_combined(df: pd.DataFrame, value_column: str, k: float = 3.0) -> pd.DataFrame:
+    """
+    Elimina outliers de un DataFrame combinado (formato largo) basándose en IQR.
+    
+    Args:
+        df: DataFrame combinado con columna de valores
+        value_column: Nombre de la columna con los valores a filtrar
+        k: Factor multiplicador del IQR (por defecto 3.0)
+        
+    Returns:
+        DataFrame filtrado sin outliers
+    """
+    if value_column not in df.columns:
+        return df
+    
+    data = df[value_column].dropna()
+    if len(data) == 0:
+        return df
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - k * IQR
+    upper_bound = Q3 + k * IQR
+    
+    # Filtrar manteniendo NaN
+    mask = (df[value_column].isna()) | ((df[value_column] >= lower_bound) & (df[value_column] <= upper_bound))
+    
+    n_removed = len(df) - mask.sum()
+    if n_removed > 0:
+        print(f"  [IQR Filter] {value_column}: eliminados {n_removed} outliers (bounds: [{lower_bound:.4f}, {upper_bound:.4f}])")
+    
+    return df[mask].copy()
+
+
 # ============================================================================
 # FUNCIONES DE VISUALIZACIÓN (Violin Plots con Seaborn)
 # ============================================================================
@@ -175,10 +305,16 @@ def plot_metric_violin_by_explainer(
     nn_contrastive: pd.DataFrame,
     metric: str,
     config: Config,
-    ax: Optional[plt.Axes] = None
+    ax: Optional[plt.Axes] = None,
+    remove_outliers: bool = True,
+    iqr_k: float = 3.0
 ) -> Optional[plt.Axes]:
     """
     Crea violin plot comparativo de una métrica: NN Standard vs NN Contrastive.
+    
+    Args:
+        remove_outliers: Si True, elimina outliers fuera de [Q1-k*IQR, Q3+k*IQR]
+        iqr_k: Factor multiplicador del IQR para definir outliers (default 3.0)
     """
     
     # Preparar datos
@@ -191,12 +327,16 @@ def plot_metric_violin_by_explainer(
     # Combinar datos
     combined = pd.concat([nn_standard_copy, nn_contrastive_copy], ignore_index=True)
     
+    # Eliminar outliers si está habilitado
+    if remove_outliers and metric in combined.columns:
+        combined = remove_outliers_iqr(combined, metric, k=iqr_k)
+    
     # Crear gráfico si no existe
     if ax is None:
         fig, ax = plt.subplots(figsize=config.FIGSIZE_SINGLE)
     
-    # Nombre limpio de la métrica
-    metric_name = config.METRIC_NAMES.get(metric, metric.replace('base_counterfactual_', ''))
+    # Nombre limpio de la métrica con flecha de dirección
+    metric_name = get_metric_name_with_arrow(metric, config)
     
     # Violin plot
     sns.violinplot(
@@ -227,10 +367,16 @@ def plot_metric_violin_by_dataset(
     nn_contrastive: pd.DataFrame,
     metric: str,
     config: Config,
-    ax: Optional[plt.Axes] = None
+    ax: Optional[plt.Axes] = None,
+    remove_outliers: bool = True,
+    iqr_k: float = 3.0
 ) -> Optional[plt.Axes]:
     """
     Crea violin plot comparativo de una métrica por dataset.
+    
+    Args:
+        remove_outliers: Si True, elimina outliers fuera de [Q1-k*IQR, Q3+k*IQR]
+        iqr_k: Factor multiplicador del IQR para definir outliers (default 3.0)
     """
     
     # Preparar datos
@@ -243,12 +389,16 @@ def plot_metric_violin_by_dataset(
     # Combinar datos
     combined = pd.concat([nn_standard_copy, nn_contrastive_copy], ignore_index=True)
     
+    # Eliminar outliers si está habilitado
+    if remove_outliers and metric in combined.columns:
+        combined = remove_outliers_iqr(combined, metric, k=iqr_k)
+    
     # Crear gráfico si no existe
     if ax is None:
         fig, ax = plt.subplots(figsize=config.FIGSIZE_SINGLE)
     
-    # Nombre limpio de la métrica
-    metric_name = config.METRIC_NAMES.get(metric, metric.replace('base_counterfactual_', ''))
+    # Nombre limpio de la métrica con flecha de dirección
+    metric_name = get_metric_name_with_arrow(metric, config)
     
     # Violin plot
     sns.violinplot(
@@ -280,7 +430,9 @@ def plot_metric_base_vs_robust_by_dataset(
     base_metric: str,
     robust_metric: str,
     config: Config,
-    ax: Optional[plt.Axes] = None
+    ax: Optional[plt.Axes] = None,
+    remove_outliers: bool = True,
+    iqr_k: float = 3.0
 ) -> Optional[plt.Axes]:
     """
     Crea violin plot comparativo de una métrica base vs su versión robust,
@@ -291,6 +443,10 @@ def plot_metric_base_vs_robust_by_dataset(
     - NN Standard (robust)
     - NN Contrastive (base)
     - NN Contrastive (robust)
+    
+    Args:
+        remove_outliers: Si True, elimina outliers fuera de [Q1-k*IQR, Q3+k*IQR]
+        iqr_k: Factor multiplicador del IQR para definir outliers (default 3.0)
     """
     
     # Verificar que las métricas existen
@@ -338,12 +494,16 @@ def plot_metric_base_vs_robust_by_dataset(
     
     combined = pd.DataFrame(rows)
     
+    # Eliminar outliers si está habilitado
+    if remove_outliers:
+        combined = remove_outliers_from_combined(combined, 'value', k=iqr_k)
+    
     # Crear gráfico si no existe
     if ax is None:
         fig, ax = plt.subplots(figsize=(14, 7))
     
-    # Nombre limpio de la métrica (usar el nombre base sin prefijo)
-    metric_name = config.METRIC_NAMES.get(base_metric, base_metric.replace('base_counterfactual_', ''))
+    # Nombre limpio de la métrica con flecha de dirección
+    metric_name = get_metric_name_with_arrow(base_metric, config)
     
     # Paleta de colores: azul para standard, naranja para contrastive, más claro para base, más oscuro para robust
     palette = {
@@ -386,11 +546,17 @@ def plot_all_metrics_base_vs_robust_grid(
     nn_standard: pd.DataFrame,
     nn_contrastive: pd.DataFrame,
     config: Config,
-    save_path: Optional[str] = None
+    save_path: Optional[str] = None,
+    remove_outliers: bool = True,
+    iqr_k: float = 3.0
 ) -> None:
     """
     Crea una matriz de violin plots comparando base vs robust para todas las métricas,
     agrupado por dataset.
+    
+    Args:
+        remove_outliers: Si True, elimina outliers fuera de [Q1-k*IQR, Q3+k*IQR]
+        iqr_k: Factor multiplicador del IQR para definir outliers (default 3.0)
     """
     
     # Pares de métricas (base, robust)
@@ -443,7 +609,12 @@ def plot_all_metrics_base_vs_robust_grid(
         
         combined = pd.DataFrame(rows)
         
-        metric_name = config.METRIC_NAMES.get(base_metric, base_metric.replace('base_counterfactual_', ''))
+        # Eliminar outliers si está habilitado
+        if remove_outliers:
+            combined = remove_outliers_from_combined(combined, 'value', k=iqr_k)
+        
+        # Nombre limpio de la métrica con flecha de dirección
+        metric_name = get_metric_name_with_arrow(base_metric, config)
         
         sns.violinplot(
             data=combined,
@@ -547,10 +718,16 @@ def plot_all_metrics_grid_violin(
     nn_contrastive: pd.DataFrame,
     metrics: List[str],
     config: Config,
-    save_path: Optional[str] = None
+    save_path: Optional[str] = None,
+    remove_outliers: bool = True,
+    iqr_k: float = 3.0
 ) -> None:
     """
     Crea una matriz de violin plots con todas las métricas.
+    
+    Args:
+        remove_outliers: Si True, elimina outliers fuera de [Q1-k*IQR, Q3+k*IQR]
+        iqr_k: Factor multiplicador del IQR para definir outliers (default 3.0)
     """
     
     # Filtrar métricas que existen
@@ -569,6 +746,12 @@ def plot_all_metrics_grid_violin(
     
     combined = pd.concat([nn_standard_copy, nn_contrastive_copy], ignore_index=True)
     
+    # Eliminar outliers para cada métrica si está habilitado
+    if remove_outliers:
+        for metric in available_metrics:
+            if metric in combined.columns:
+                combined = remove_outliers_iqr(combined, metric, k=iqr_k)
+    
     # Crear grid
     n_cols = 3
     n_rows = (len(available_metrics) + n_cols - 1) // n_cols
@@ -578,7 +761,8 @@ def plot_all_metrics_grid_violin(
     
     for idx, metric in enumerate(available_metrics):
         ax = axes[idx]
-        metric_name = config.METRIC_NAMES.get(metric, metric.replace('base_counterfactual_', ''))
+        # Nombre limpio de la métrica con flecha de dirección
+        metric_name = get_metric_name_with_arrow(metric, config)
         
         sns.violinplot(
             data=combined,
@@ -643,7 +827,8 @@ def perform_statistical_tests(
     available_metrics = [m for m in metrics if m in nn_standard.columns and m in nn_contrastive.columns]
     
     for metric in available_metrics:
-        metric_name = config.METRIC_NAMES.get(metric, metric)
+        # Nombre limpio de la métrica con flecha de dirección
+        metric_name = get_metric_name_with_arrow(metric, config)
         
         # Obtener datos
         data_standard = nn_standard[metric].dropna()
@@ -673,14 +858,30 @@ def perform_statistical_tests(
         std_standard = data_standard.std()
         std_contrastive = data_contrastive.std()
         
-        # Determinar dirección del efecto
+        # Obtener si mayor es mejor para esta métrica
+        is_higher_better = config.METRIC_DIRECTION.get(
+            metric, 
+            config.METRIC_DIRECTION.get(metric.replace('base_counterfactual_', '').replace('robust_counterfactual_', ''), True)
+        )
+        
+        # Determinar dirección del efecto considerando qué es "mejor"
         if mw_pvalue < 0.05 if not np.isnan(mw_pvalue) else False:
-            if mean_contrastive > mean_standard:
-                direction = 'NN Contrastive > NN Standard'
-                winner = 'NN Contrastive'
+            if is_higher_better:
+                # Mayor es mejor
+                if mean_contrastive > mean_standard:
+                    direction = 'NN Contrastive > NN Standard'
+                    winner = 'NN Contrastive'
+                else:
+                    direction = 'NN Standard > NN Contrastive'
+                    winner = 'NN Standard'
             else:
-                direction = 'NN Standard > NN Contrastive'
-                winner = 'NN Standard'
+                # Menor es mejor
+                if mean_contrastive < mean_standard:
+                    direction = 'NN Contrastive < NN Standard'
+                    winner = 'NN Contrastive'
+                else:
+                    direction = 'NN Standard < NN Contrastive'
+                    winner = 'NN Standard'
         else:
             direction = 'No significant difference'
             winner = 'None'
@@ -744,7 +945,8 @@ def perform_paired_statistical_tests(
         if len(data_base) < 2:
             continue
         
-        metric_name = config.METRIC_NAMES.get(base_metric, base_metric.replace('base_counterfactual_', ''))
+        # Nombre limpio de la métrica con flecha de dirección
+        metric_name = get_metric_name_with_arrow(base_metric, config)
         
         # Wilcoxon signed-rank test (datos pareados)
         try:
@@ -767,14 +969,30 @@ def perform_paired_statistical_tests(
         mean_robust = data_robust.mean()
         mean_diff = (data_robust - data_base).mean()
         
-        # Determinar dirección del efecto
+        # Obtener si mayor es mejor para esta métrica
+        is_higher_better = config.METRIC_DIRECTION.get(
+            base_metric, 
+            config.METRIC_DIRECTION.get(base_metric.replace('base_counterfactual_', '').replace('robust_counterfactual_', ''), True)
+        )
+        
+        # Determinar dirección del efecto considerando qué es "mejor"
         if wilcoxon_pvalue < 0.05 if not np.isnan(wilcoxon_pvalue) else False:
-            if mean_robust > mean_base:
-                direction = 'Robust > Base'
-                winner = 'Robust'
+            if is_higher_better:
+                # Mayor es mejor
+                if mean_robust > mean_base:
+                    direction = 'Robust > Base'
+                    winner = 'Robust'
+                else:
+                    direction = 'Base > Robust'
+                    winner = 'Base'
             else:
-                direction = 'Base > Robust'
-                winner = 'Base'
+                # Menor es mejor
+                if mean_robust < mean_base:
+                    direction = 'Robust < Base'
+                    winner = 'Robust'
+                else:
+                    direction = 'Base < Robust'
+                    winner = 'Base'
         else:
             direction = 'No significant difference'
             winner = 'None'
@@ -828,7 +1046,8 @@ def perform_statistical_tests_by_dataset(
         df_con = nn_contrastive[nn_contrastive['dataset_name'] == dataset]
         
         for metric in available_metrics:
-            metric_name = config.METRIC_NAMES.get(metric, metric)
+            # Nombre limpio de la métrica con flecha de dirección
+            metric_name = get_metric_name_with_arrow(metric, config)
             
             data_standard = df_std[metric].dropna()
             data_contrastive = df_con[metric].dropna()
@@ -846,16 +1065,32 @@ def perform_statistical_tests_by_dataset(
             n1, n2 = len(data_standard), len(data_contrastive)
             effect_size = 1 - (2 * mw_stat) / (n1 * n2) if n1 > 0 and n2 > 0 and not np.isnan(mw_stat) else np.nan
             
-            # Determinar dirección del efecto
+            # Obtener si mayor es mejor para esta métrica
+            is_higher_better = config.METRIC_DIRECTION.get(
+                metric, 
+                config.METRIC_DIRECTION.get(metric.replace('base_counterfactual_', '').replace('robust_counterfactual_', ''), True)
+            )
+            
+            # Determinar dirección del efecto considerando qué es "mejor"
             mean_std = data_standard.mean()
             mean_con = data_contrastive.mean()
             if mw_pvalue < 0.05 if not np.isnan(mw_pvalue) else False:
-                if mean_con > mean_std:
-                    direction = 'NN Contrastive > NN Standard'
-                    winner = 'NN Contrastive'
+                if is_higher_better:
+                    # Mayor es mejor
+                    if mean_con > mean_std:
+                        direction = 'NN Contrastive > NN Standard'
+                        winner = 'NN Contrastive'
+                    else:
+                        direction = 'NN Standard > NN Contrastive'
+                        winner = 'NN Standard'
                 else:
-                    direction = 'NN Standard > NN Contrastive'
-                    winner = 'NN Standard'
+                    # Menor es mejor
+                    if mean_con < mean_std:
+                        direction = 'NN Contrastive < NN Standard'
+                        winner = 'NN Contrastive'
+                    else:
+                        direction = 'NN Standard < NN Contrastive'
+                        winner = 'NN Standard'
             else:
                 direction = 'No significant difference'
                 winner = 'None'

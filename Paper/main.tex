@@ -1,0 +1,133 @@
+\documentclass[11pt,a4paper]{article}
+
+% ============================================
+% PACKAGES
+% ============================================
+
+% Encoding and fonts
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% Language (change to your preferred language)
+\usepackage[english]{babel}
+
+% Math packages
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+
+% Graphics and figures
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\graphicspath{{Figures/}}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+
+% Colors and hyperlinks
+\usepackage[dvipsnames]{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+% Algorithms
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+% Code listings
+\usepackage{listings}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    tabsize=4
+}
+
+% Miscellaneous
+\usepackage{lipsum} % For placeholder text (remove in final version)
+\usepackage{todonotes} % For TODO notes (remove in final version)
+\usepackage{cleveref} % Smart cross-references
+
+% Page layout
+\usepackage[margin=2.5cm]{geometry}
+
+% Bibliography
+\usepackage[numbers,sort&compress]{natbib}
+
+% ============================================
+% CUSTOM COMMANDS
+% ============================================
+
+% Math operators
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% Shortcuts
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+
+% ============================================
+% DOCUMENT INFO
+% ============================================
+
+\title{Your Paper Title Here}
+\author{
+    Author One\thanks{Affiliation One, email@example.com} 
+    \and 
+    Author Two\thanks{Affiliation Two, email2@example.com}
+}
+\date{\today}
+
+% ============================================
+% DOCUMENT
+% ============================================
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    \input{Sections/abstract}
+\end{abstract}
+
+\textbf{Keywords:} keyword1, keyword2, keyword3
+
+% ============================================
+% MAIN CONTENT
+% ============================================
+
+\input{Sections/introduction}
+\input{Sections/related_work}
+\input{Sections/methodology}
+\input{Sections/experimental_setup}
+\input{Sections/experimental_results}
+\input{Sections/conclusion}
+
+% ============================================
+% ACKNOWLEDGMENTS
+% ============================================
+
+\section*{Acknowledgments}
+The authors would like to thank...
+
+% ============================================
+% BIBLIOGRAPHY
+% ============================================
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+% ============================================
+% APPENDIX
+% ============================================
+
+\appendix
+\input{Sections/appendix}
+
+\end{document}
