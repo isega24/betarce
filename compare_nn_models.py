@@ -1171,7 +1171,8 @@ def export_statistical_tests(
         for _, row in global_tests.iterrows():
             sig = "***" if row['significant_0.001'] else ("**" if row['significant_0.01'] else ("*" if row['significant_0.05'] else ""))
             direction_str = f" → {row['winner']}" if row['winner'] != 'None' else ""
-            print(f"    {row['metric']}: p={row['p_value']:.4e} {sig}{direction_str}")
+            effect_size = row.get('effect_size', np.nan)
+            print(f"    {row['metric']}: p={row['p_value']:.4e} {sig}{direction_str}, r = {effect_size}")
         
         # Resumen de ganadores
         winners = global_tests[global_tests['winner'] != 'None']['winner'].value_counts()
@@ -1184,9 +1185,11 @@ def export_statistical_tests(
         for _, row in paired_all.iterrows():
             sig = "***" if row['significant_0.001'] else ("**" if row['significant_0.01'] else ("*" if row['significant_0.05'] else ""))
             direction_str = f" → {row['winner']}" if row['winner'] != 'None' else ""
-            print(f"    {row['comparison']} - {row['metric']}: p={row['p_value']:.4e} {sig}{direction_str}")
+            effect_size = row.get('effect_size', np.nan)
+            print(f"    {row['comparison']} - {row['metric']}: p={row['p_value']:.4e} {sig}{direction_str}, r = {effect_size}")
     
     print("\n  Leyenda: * p<0.05, ** p<0.01, *** p<0.001")
+    print("\n            r = effect size: r < 0.3: pequeño, 0.3 <= r < 0.5: mediano, 0.5 <= r < 1: grande")
 
 
 # ============================================================================
